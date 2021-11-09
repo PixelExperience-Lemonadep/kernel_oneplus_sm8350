@@ -2870,6 +2870,8 @@ ssize_t notify_fppress_store(struct device *dev,
 }
 
 extern int aod_layer_hide;
+extern int backup_dim_status;
+extern bool backup_dimlayer_hbm;
 extern bool HBM_flag;
 extern int dsi_panel_tx_cmd_set(struct dsi_panel *panel,
 				enum dsi_cmd_set_type type);
@@ -2931,6 +2933,8 @@ ssize_t notify_dim_store(struct device *dev,
 		return count;
 	oneplus_dim_status = dim_status;
 	oneplus_dimlayer_hbm_enable = oneplus_dim_status != 0;
+	backup_dimlayer_hbm = oneplus_dimlayer_hbm_enable;
+	backup_dim_status = oneplus_dim_status;
 	pr_err("notify dim %d,aod = %d press= %d aod_hide =%d\n",
 		oneplus_dim_status, dsi_display->panel->aod_status, oneplus_onscreenfp_status, aod_layer_hide);
 	if (oneplus_dim_status == 1 && HBM_flag) {
@@ -5066,12 +5070,16 @@ static int sde_crtc_onscreenfinger_atomic_check(struct sde_crtc_state *cstate,
 		(oneplus_dim_status == 5 || aod_layer_hide == 1)) {
 		SDE_ERROR("display  oneplus_onscreenaod_hid is 1\n");
 		oneplus_aod_hid = 1;
-		dim_mode = 0;
+ 		dim_mode = 0;
 	}
 
     aod_mode = oneplus_aod_hid;
-	if (oneplus_dim_status == 5 && display->panel->aod_status == 0)
+	if (oneplus_dim_status == 5 && display->panel->aod_status == 0) {
 		dim_mode = 0;
+		oneplus_dim_status = 0;
+		oneplus_dimlayer_hbm_enable = false;
+		pr_err("current dim = %d, oneplus_dimlayer_hbm_enable = %d\n", oneplus_dim_status, oneplus_dimlayer_hbm_enable);
+	}
 
 	for (i = 0; i < cnt; i++) {
 		mode = sde_plane_check_fingerprint_layer(pstates[i].drm_pstate);
