@@ -149,6 +149,13 @@ static ssize_t status_store(struct device *device,
 	return ret ? ret : count;
 }
 
+int oneplus_panel_status = 0;
+static ssize_t op_display_get_power_status(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", oneplus_panel_status);
+}
+
 static ssize_t status_show(struct device *device,
 			   struct device_attribute *attr,
 			   char *buf)
