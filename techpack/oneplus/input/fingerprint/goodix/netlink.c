@@ -16,7 +16,7 @@
 #define MAX_MSGSIZE 32
 
 static int pid = -1;
-struct sock *gf_nl_sk = NULL;
+struct sock *gf_nl_sk;
 
 void sendnlmsg(char *msg)
 {
@@ -24,8 +24,9 @@ void sendnlmsg(char *msg)
 	struct nlmsghdr *nlh;
 	int len = NLMSG_SPACE(MAX_MSGSIZE);
 	int ret = 0;
+
 	if (!msg || !gf_nl_sk || !pid) {
-		return ;
+		return;
 	}
 	skb_1 = alloc_skb(len, GFP_KERNEL);
 	if (!skb_1) {
@@ -54,8 +55,9 @@ void sendnlmsg_tp(struct fp_underscreen_info *msg, int length)
 	struct nlmsghdr *nlh;
 	int len = NLMSG_SPACE(MAX_MSGSIZE);
 	int ret = 0;
+
 	if (!msg || !gf_nl_sk || !pid) {
-		return ;
+		return;
 	}
 	skb_1 = alloc_skb(len, GFP_KERNEL);
 	if (!skb_1) {
@@ -81,8 +83,9 @@ void nl_data_ready(struct sk_buff *__skb)
 	struct sk_buff *skb;
 	struct nlmsghdr *nlh;
 	char str[100];
-	skb = skb_get (__skb);
-	if(skb->len >= NLMSG_SPACE(0))
+
+	skb = skb_get(__skb);
+	if (skb->len >= NLMSG_SPACE(0))
 	{
 		nlh = nlmsg_hdr(skb);
 
@@ -98,6 +101,7 @@ void nl_data_ready(struct sk_buff *__skb)
 int netlink_init(void)
 {
 	struct netlink_kernel_cfg netlink_cfg;
+
 	memset(&netlink_cfg, 0, sizeof(struct netlink_kernel_cfg));
 
 	netlink_cfg.groups = 0;
@@ -108,7 +112,7 @@ int netlink_init(void)
 	gf_nl_sk = netlink_kernel_create(&init_net, NETLINK_TEST,
 			&netlink_cfg);
 
-	if(!gf_nl_sk){
+	if (!gf_nl_sk) {
 		pr_err("create netlink socket error\n");
 		return 1;
 	}
@@ -118,7 +122,7 @@ int netlink_init(void)
 
 void netlink_exit(void)
 {
-	if(gf_nl_sk != NULL){
+	if (gf_nl_sk != NULL) {
 		netlink_kernel_release(gf_nl_sk);
 		gf_nl_sk = NULL;
 	}

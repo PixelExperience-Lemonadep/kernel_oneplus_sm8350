@@ -80,7 +80,7 @@ static DEFINE_MUTEX(device_list_lock);
 static struct wakeup_source fp_wakelock;
 static struct gf_dev gf;
 static struct drm_panel *gf_lcd_active_panel;
-static int fp_version = 0;
+static int fp_version;
 struct gf_key_map maps[] = {
 	{ EV_KEY, GF_KEY_INPUT_HOME },
 	{ EV_KEY, GF_KEY_INPUT_MENU },
@@ -251,8 +251,9 @@ static irqreturn_t gf_irq(int irq, void *handle)
 	//wake_lock_timeout(&fp_wakelock, msecs_to_jiffies(WAKELOCK_HOLD_TIME));
 	__pm_wakeup_event(&fp_wakelock, WAKELOCK_HOLD_TIME);
 	sendnlmsg(&msg);
-#elif defined (GF_FASYNC)
+#elif defined(GF_FASYNC)
 	struct gf_dev *gf_dev = &gf;
+
 	if (gf_dev->async)
 		kill_fasync(&gf_dev->async, SIGIO, POLL_IN);
 #endif
@@ -289,13 +290,14 @@ static int irq_setup(struct gf_dev *gf_dev)
 static void gf_kernel_key_input(struct gf_dev *gf_dev, struct gf_key *gf_key)
 {
 	uint32_t key_input = 0;
-	if (GF_KEY_HOME == gf_key->key) {
+
+	if (gf_key->key == GF_KEY_HOME) {
 		key_input = GF_KEY_INPUT_HOME;
-	} else if (GF_KEY_POWER == gf_key->key) {
+	} else if (gf_key->key == GF_KEY_POWER) {
 		key_input = GF_KEY_INPUT_POWER;
-	} else if (GF_KEY_CAMERA == gf_key->key) {
+	} else if (gf_key->key == GF_KEY_CAMERA) {
 		key_input = GF_KEY_INPUT_CAMERA;
-	} else if (GF_KEY_LONGPRESS == gf_key->key) {
+	} else if (gf_key->key == GF_KEY_LONGPRESS) {
 		key_input = GF_KEY_INPUT_LONG_PRESS;
 	} else {
 		/* add special key define */
@@ -312,7 +314,7 @@ static void gf_kernel_key_input(struct gf_dev *gf_dev, struct gf_key *gf_key)
 		input_sync(gf_dev->input);
 	}
 
-	if (GF_KEY_HOME == gf_key->key) {
+	if (gf_key->key == GF_KEY_HOME) {
 		input_report_key(gf_dev->input, key_input, gf_key->value);
 		input_sync(gf_dev->input);
 	}
@@ -340,7 +342,7 @@ static long gf_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		if ((cmd == GF_IOC_ENABLE_POWER) || (cmd == GF_IOC_DISABLE_POWER)) {
 			pr_info("power cmd\n");
 		} else {
-			pr_info("Sensor is power off currently. \n");
+			pr_info("Sensor is power off currently.\n");
 			//return -ENODEV;
 		}
 	}
@@ -365,7 +367,7 @@ static long gf_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		gf_enable_irq(gf_dev);
 		break;
 	case GF_IOC_RESET:
-		pr_info("%s GF_IOC_RESET. \n", __func__);
+		pr_info("%s GF_IOC_RESET.\n", __func__);
 		gf_hw_reset(gf_dev, 0);
 		break;
 	case GF_IOC_INPUT_KEY_EVENT:
@@ -453,6 +455,7 @@ static int gf_open(struct inode *inode, struct file *filp)
 {
 	struct gf_dev *gf_dev = &gf;
 	int status = -ENXIO;
+
 	mutex_lock(&device_list_lock);
 
 	list_for_each_entry(gf_dev, &device_list, device_entry) {
@@ -470,7 +473,7 @@ static int gf_open(struct inode *inode, struct file *filp)
 			nonseekable_open(inode, filp);
 			pr_info("Succeed to open device. irq = %d\n",
 					gf_dev->irq);
-            #if 0  //zoulian@20170727 parse dts move to probe
+	    #if 0  //zoulian@20170727 parse dts move to probe
 			if (gf_dev->users == 1) {
 				status = gf_parse_dts(gf_dev);
 				if (status)
@@ -480,7 +483,7 @@ static int gf_open(struct inode *inode, struct file *filp)
 				if (status)
 					goto err_irq;
 			}
-            #endif
+	    #endif
 			//gf_hw_reset(gf_dev, 5);
 			//gf_dev->device_available = 1;
 		}
@@ -571,8 +574,8 @@ static const struct attribute_group gf_attribute_group = {
 	.attrs = gf_attributes,
 };
 
-static struct fp_underscreen_info fp_tpinfo ={0};
-int opticalfp_irq_handler(struct fp_underscreen_info* tp_info)
+static struct fp_underscreen_info fp_tpinfo = {0};
+int opticalfp_irq_handler(struct fp_underscreen_info *tp_info)
 {
 	pr_info("[info]:%s\n", __func__);
 
@@ -580,13 +583,13 @@ int opticalfp_irq_handler(struct fp_underscreen_info* tp_info)
 		return 0;
 	}
 	fp_tpinfo = *tp_info;
-	pr_err("[%s] %s fp_tpinfo.x = %d, fp_tpinfo.y = %d\n",__func__, fp_tpinfo.touch_state == 1 ? "TOUCH_DOWN" :"TOUCH_UP", fp_tpinfo.x, fp_tpinfo.y);
+	pr_err("[%s] %s fp_tpinfo.x = %d, fp_tpinfo.y = %d\n", __func__, fp_tpinfo.touch_state == 1 ? "TOUCH_DOWN" : "TOUCH_UP", fp_tpinfo.x, fp_tpinfo.y);
 	if (fp_tpinfo.touch_state == 1) {
 		fp_tpinfo.touch_state = GF_NET_EVENT_TP_TOUCHDOWN;
-		sendnlmsg_tp(&fp_tpinfo,sizeof(fp_tpinfo));
+		sendnlmsg_tp(&fp_tpinfo, sizeof(fp_tpinfo));
 	} else if (fp_tpinfo.touch_state == 0) {
 		fp_tpinfo.touch_state = GF_NET_EVENT_TP_TOUCHUP;
-		sendnlmsg_tp(&fp_tpinfo,sizeof(fp_tpinfo));
+		sendnlmsg_tp(&fp_tpinfo, sizeof(fp_tpinfo));
 	}
 	return 0;
 }
@@ -640,7 +643,7 @@ static int goodix_fb_state_chg_callback(struct notifier_block *nb,
 #if defined(GF_NETLINK_ENABLE)
 				msg = GF_NET_EVENT_FB_BLACK;
 				sendnlmsg(&msg);
-#elif defined (GF_FASYNC)
+#elif defined(GF_FASYNC)
 				if (gf_dev->async) {
 					kill_fasync(&gf_dev->async, SIGIO, POLL_IN);
 				}
@@ -653,7 +656,7 @@ static int goodix_fb_state_chg_callback(struct notifier_block *nb,
 #if defined(GF_NETLINK_ENABLE)
 				msg = GF_NET_EVENT_FB_UNBLACK;
 				sendnlmsg(&msg);
-#elif defined (GF_FASYNC)
+#elif defined(GF_FASYNC)
 				if (gf_dev->async) {
 					kill_fasync(&gf_dev->async, SIGIO, POLL_IN);
 				}
@@ -680,12 +683,13 @@ static int goodix_fb_state_chg_callback(
 	struct drm_panel_notifier *evdata = data;
 	unsigned int blank;
 	char msg = 0;
+
 	pr_info("[info] %s go to the msm_drm_notifier_callback value = %d\n",
 			__func__, (int)val);
 	if (val != DRM_PANEL_EARLY_EVENT_BLANK &&
 		val != 5)
 		return 0;
-	
+
 	blank = *(int *)(evdata->data);
 
 	if (val == 5) {
@@ -821,6 +825,7 @@ static int gf_probe(struct platform_device *pdev)
 	minor = find_first_zero_bit(minors, N_SPI_MINORS);
 	if (minor < N_SPI_MINORS) {
 		struct device *dev;
+
 		gf_dev->devt = MKDEV(SPIDEV_MAJOR, minor);
 		dev = device_create(gf_class, &gf_dev->spi->dev, gf_dev->devt,
 				gf_dev, GF_DEV_NAME);
@@ -890,7 +895,7 @@ static int gf_probe(struct platform_device *pdev)
 	pr_info("Get the clk resource.\n");
 	/* Enable spi clock */
 	if (gfspi_ioctl_clk_init(gf_dev))
-		goto gfspi_probe_clk_init_failed:
+		goto gfspi_probe_clk_init_failed : 
 
 	if (gfspi_ioctl_clk_enable(gf_dev))
 		goto gfspi_probe_clk_enable_failed;
@@ -910,7 +915,7 @@ static int gf_probe(struct platform_device *pdev)
 		status = drm_panel_notifier_register(gf_lcd_active_panel, &gf_dev->msm_drm_notif);
 		if (status) {
 			pr_err("Unable to register fb_notifier: %d\n", status);
-		}else{
+		} else {
 			pr_err("register notifier drm panel success!");
 		}
 	}
@@ -972,7 +977,7 @@ static int gf_remove(struct platform_device *pdev)
 #if defined(CONFIG_FB)
 	fb_unregister_client(&gf_dev->notifier);
 #elif defined(CONFIG_MSM_RDM_NOTIFY)
-	if (drm_panel_notifier_unregister(gf_lcd_active_panel,&gf_dev->msm_drm_notif))
+	if (drm_panel_notifier_unregister(gf_lcd_active_panel, &gf_dev->msm_drm_notif))
 		pr_err("Error occurred while unregistering msm_drm_notifier.\n");
 #endif
 	if (gf_dev->input)
