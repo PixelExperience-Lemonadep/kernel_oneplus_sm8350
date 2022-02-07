@@ -22,7 +22,7 @@
 #endif
 //#include <linux/oneplus/boot_mode.h>
 
-int gf_pinctrl_init(struct gf_dev* gf_dev)
+int gf_pinctrl_init(struct gf_dev *gf_dev)
 {
 	int ret = 0;
 	struct device *dev = &gf_dev->spi->dev;
@@ -57,7 +57,7 @@ err:
 	gf_dev->gpio_state_disable = NULL;
 	return ret;
 }
-int gf_parse_dts(struct gf_dev* gf_dev)
+int gf_parse_dts(struct gf_dev *gf_dev)
 {
 	int rc = 0;
 	struct device *dev = &gf_dev->spi->dev;
@@ -101,7 +101,7 @@ err_reset:
 
 void gf_cleanup(struct gf_dev *gf_dev)
 {
-	pr_info("[info] %s\n",__func__);
+	pr_info("[info] %s\n", __func__);
 	if (gpio_is_valid(gf_dev->irq_gpio))
 	{
 		gpio_free(gf_dev->irq_gpio);
@@ -114,24 +114,25 @@ void gf_cleanup(struct gf_dev *gf_dev)
 	}
 }
 
-int gf_power_on(struct gf_dev* gf_dev)
+int gf_power_on(struct gf_dev *gf_dev)
 {
 	int rc = 0;
 	struct device *dev = &gf_dev->spi->dev;
 	struct regulator *vreg = gf_dev->vdd_3v3;
+
 	pr_info("----gf_spi_driver FDO power on enter ----\n");
 	if (!vreg) {
 	    vreg = regulator_get(dev, "fppower");
-	    if (IS_ERR(vreg)) {
-	        pr_err("Unable to get fppower power.\n");
-	        return PTR_ERR(vreg);
-	    }
+	if (IS_ERR(vreg)) {
+		pr_err("Unable to get fppower power.\n");
+		return PTR_ERR(vreg);
+	}
 	}
 	if (regulator_count_voltages(vreg) > 0) {
 	    rc = regulator_set_voltage(vreg, 3008000, 3008000);
-	    if (rc) {
-	        pr_err("Unable to set voltage on fppower, %d\n", rc);
-	    }
+	if (rc) {
+		pr_err("Unable to set voltage on fppower, %d\n", rc);
+	}
 	}
 	rc = regulator_set_load(vreg, 150000);
 	if (rc < 0) {
@@ -154,10 +155,11 @@ int gf_power_on(struct gf_dev* gf_dev)
 	return rc;
 }
 
-int gf_power_off(struct gf_dev* gf_dev)
+int gf_power_off(struct gf_dev *gf_dev)
 {
 	int rc = 0;
 	struct regulator *vreg = gf_dev->vdd_3v3;
+
 	pr_info("----gf_spi_driver FDO power off enter ----\n");
 	if (vreg) {
 		if (regulator_is_enabled(vreg)) {
@@ -180,7 +182,7 @@ int gf_power_off(struct gf_dev* gf_dev)
 
 int gf_hw_reset(struct gf_dev *gf_dev, unsigned int delay_ms)
 {
-	if(gf_dev == NULL) {
+	if (gf_dev == NULL) {
 		pr_info("Input buff is NULL.\n");
 		return -1;
 	}
@@ -194,7 +196,7 @@ int gf_hw_reset(struct gf_dev *gf_dev, unsigned int delay_ms)
 
 int gf_irq_num(struct gf_dev *gf_dev)
 {
-	if(gf_dev == NULL) {
+	if (gf_dev == NULL) {
 		pr_info("Input buff is NULL.\n");
 		return -1;
 	} else {
