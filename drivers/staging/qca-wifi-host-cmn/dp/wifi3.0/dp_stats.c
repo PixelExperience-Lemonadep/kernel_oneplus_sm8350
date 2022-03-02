@@ -5956,6 +5956,8 @@ void dp_txrx_path_stats(struct dp_soc *soc)
 			       pdev->stats.tx.dropped.fw_rem_notx);
 		DP_PRINT_STATS("Invalid peer on tx path: %u",
 			       pdev->soc->stats.tx.tx_invalid_peer.num);
+		DP_PRINT_STATS("Tx desc freed in non-completion path: %u",
+			       pdev->soc->stats.tx.tx_comp_exception);
 
 		DP_PRINT_STATS("Tx packets sent per interrupt:");
 		DP_PRINT_STATS("Single Packet: %u",
@@ -6030,8 +6032,6 @@ void dp_txrx_path_stats(struct dp_soc *soc)
 			       pdev->soc->stats.rx.err.reo_err_oor_to_stack);
 		DP_PRINT_STATS("REO err oor msdu drop: %u",
 			       pdev->soc->stats.rx.err.reo_err_oor_drop);
-		DP_PRINT_STATS("REO err oor eapol drop: %u",
-			       pdev->soc->stats.rx.err.reo_err_oor_eapol_drop);
 		DP_PRINT_STATS("Rx err msdu rejected: %d",
 			       soc->stats.rx.err.rejected);
 		DP_PRINT_STATS("Rx raw frame dropped: %d",
@@ -6618,9 +6618,6 @@ dp_print_soc_rx_stats(struct dp_soc *soc)
 
 	DP_PRINT_STATS("REO err oor msdu drop: %d",
 		       soc->stats.rx.err.reo_err_oor_drop);
-
-	DP_PRINT_STATS("REO err oor eapol drop: %d",
-		       soc->stats.rx.err.reo_err_oor_eapol_drop);
 
 	DP_PRINT_STATS("Rx err msdu rejected: %d",
 		       soc->stats.rx.err.rejected);

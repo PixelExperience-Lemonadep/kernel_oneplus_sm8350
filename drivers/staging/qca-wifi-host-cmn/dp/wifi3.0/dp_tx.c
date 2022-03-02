@@ -58,6 +58,8 @@
 /* invalid peer id for reinject*/
 #define DP_INVALID_PEER 0XFFFE
 
+#define DP_RETRY_COUNT 7
+
 /*mapping between hal encrypt type and cdp_sec_type*/
 #define MAX_CDP_SEC_TYPE 12
 static const uint8_t sec_type_map[MAX_CDP_SEC_TYPE] = {
@@ -1562,6 +1564,36 @@ dp_tx_hw_desc_update_evt(uint8_t *hal_tx_desc_cached,
 }
 #endif
 
+#if defined(CLEAR_SW2TCL_CONSUMED_DESC)
+/**
+ * dp_tx_clear_consumed_hw_descs - Reset all the consumed Tx ring descs to 0
+ *
+ * @soc: DP soc handle
+ * @hal_ring_hdl: Source ring pointer
+ *
+ * Return: void
+ */
+static inline
+void dp_tx_clear_consumed_hw_descs(struct dp_soc *soc,
+				   hal_ring_handle_t hal_ring_hdl)
+{
+	void *desc = hal_srng_src_get_next_consumed(soc->hal_soc, hal_ring_hdl);
+
+	while (desc) {
+		hal_tx_desc_clear(desc);
+		desc = hal_srng_src_get_next_consumed(soc->hal_soc,
+						      hal_ring_hdl);
+	}
+}
+
+#else
+static inline
+void dp_tx_clear_consumed_hw_descs(struct dp_soc *soc,
+				   hal_ring_handle_t hal_ring_hdl)
+{
+}
+#endif /* CLEAR_SW2TCL_CONSUMED_DESC */
+
 /**
  * dp_tx_hw_enqueue() - Enqueue to TCL HW for transmit
  * @soc: DP Soc Handle
@@ -1696,6 +1728,8 @@ dp_tx_hw_enqueue(struct dp_soc *soc, struct dp_vdev *vdev,
 		DP_STATS_INC(vdev, tx_i.dropped.enqueue_fail, 1);
 		return status;
 	}
+
+	dp_tx_clear_consumed_hw_descs(soc, hal_ring_hdl);
 
 	/* Sync cached descriptor with HW */
 
@@ -2514,7 +2548,6 @@ qdf_nbuf_t dp_tx_send_msdu_multiple(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 				    tid_tx_stats[tx_q->ring_id][msdu_info->tid];
 			tid_stats->swdrop_cnt[TX_HW_ENQUEUE]++;
 
-			dp_tx_desc_release(tx_desc, tx_q->desc_pool_id);
 			if (msdu_info->frm_type == dp_tx_frm_me) {
 				hw_enq_fail++;
 				if (hw_enq_fail == msdu_info->num_seg) {
@@ -2540,6 +2573,7 @@ qdf_nbuf_t dp_tx_send_msdu_multiple(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 						msdu_info->u.sg_info
 						.curr_seg->next;
 				i++;
+				dp_tx_desc_release(tx_desc, tx_q->desc_pool_id);
 				continue;
 			}
 
@@ -2556,9 +2590,11 @@ qdf_nbuf_t dp_tx_send_msdu_multiple(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 				 */
 				dp_tx_comp_free_buf(soc, tx_desc);
 				i++;
+				dp_tx_desc_release(tx_desc, tx_q->desc_pool_id);
 				continue;
 			}
 
+			dp_tx_desc_release(tx_desc, tx_q->desc_pool_id);
 			goto done;
 		}
 
@@ -4081,12 +4117,15 @@ dp_tx_update_peer_stats(struct dp_tx_desc_s *tx_desc,
 	DP_STATS_INCC(peer, tx.stbc, 1, ts->stbc);
 	DP_STATS_INCC(peer, tx.ldpc, 1, ts->ldpc);
 	DP_STATS_INCC(peer, tx.retries, 1, ts->transmit_cnt > 1);
-
 #if defined(FEATURE_PERPKT_INFO) && WDI_EVENT_ENABLE
 	dp_wdi_event_handler(WDI_EVENT_UPDATE_DP_STATS, pdev->soc,
 			     &peer->stats, ts->peer_id,
 			     UPDATE_PEER_STATS, pdev->pdev_id);
 #endif
+	if (ts->first_msdu)
+		DP_STATS_INCC(peer, tx.mpdu_success_with_retries,
+			      qdf_do_div(ts->transmit_cnt, DP_RETRY_COUNT),
+			      ts->transmit_cnt > DP_RETRY_COUNT);
 }
 
 #ifdef QCA_LL_TX_FLOW_CONTROL_V2
@@ -4868,6 +4907,7 @@ more_data:
 				 !tx_desc->flags)) {
 				dp_info_rl("Descriptor freed in vdev_detach %d",
 					   tx_desc_id);
+				DP_STATS_INC(soc, tx.tx_comp_exception, 1);
 				continue;
 			}
 

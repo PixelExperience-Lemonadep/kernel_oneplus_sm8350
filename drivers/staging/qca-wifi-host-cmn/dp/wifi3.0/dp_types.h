@@ -28,6 +28,7 @@
 #include <qdf_lro.h>
 #include <queue.h>
 #include <htt_common.h>
+#include <htt.h>
 #include <htt_stats.h>
 #include <cdp_txrx_cmn.h>
 #ifdef DP_MOB_DEFS
@@ -532,6 +533,30 @@ struct dp_tx_desc_s {
 	struct hal_tx_desc_comp_s comp;
 };
 
+#ifdef QCA_AC_BASED_FLOW_CONTROL
+/**
+ * enum flow_pool_status - flow pool status
+ * @FLOW_POOL_ACTIVE_UNPAUSED : pool is active (can take/put descriptors)
+ *				and network queues are unpaused
+ * @FLOW_POOL_ACTIVE_PAUSED: pool is active (can take/put descriptors)
+ *			   and network queues are paused
+ * @FLOW_POOL_INVALID: pool is invalid (put descriptor)
+ * @FLOW_POOL_INACTIVE: pool is inactive (pool is free)
+ * @FLOW_POOL_ACTIVE_UNPAUSED_REATTACH: pool is reattached but network
+ *					queues are not paused
+ */
+enum flow_pool_status {
+	FLOW_POOL_ACTIVE_UNPAUSED = 0,
+	FLOW_POOL_ACTIVE_PAUSED = 1,
+	FLOW_POOL_BE_BK_PAUSED = 2,
+	FLOW_POOL_VI_PAUSED = 3,
+	FLOW_POOL_VO_PAUSED = 4,
+	FLOW_POOL_INVALID = 5,
+	FLOW_POOL_INACTIVE = 6,
+	FLOW_POOL_ACTIVE_UNPAUSED_REATTACH = 7,
+};
+
+#else
 /**
  * enum flow_pool_status - flow pool status
  * @FLOW_POOL_ACTIVE_UNPAUSED : pool is active (can take/put descriptors)
@@ -550,6 +575,8 @@ enum flow_pool_status {
 	FLOW_POOL_INVALID = 5,
 	FLOW_POOL_INACTIVE = 6,
 };
+
+#endif
 
 /**
  * struct dp_tx_tso_seg_pool_s
@@ -910,6 +937,8 @@ struct dp_soc_stats {
 		uint32_t tx_comp_loop_pkt_limit_hit;
 		/* Head pointer Out of sync at the end of dp_tx_comp_handler */
 		uint32_t hp_oos2;
+		/* tx desc freed as part of vdev detach */
+		uint32_t tx_comp_exception;
 	} tx;
 
 	/* SOC level RX stats */
@@ -1006,6 +1035,10 @@ struct dp_soc_stats {
 			uint32_t rx_2k_jump_to_stack;
 			/* RX 2k jump msdu dropped count */
 			uint32_t rx_2k_jump_drop;
+			/* REO ERR msdu buffer received */
+			uint32_t reo_err_msdu_buf_rcved;
+			/* REO ERR msdu buffer with invalid coookie received */
+			uint32_t reo_err_msdu_buf_invalid_cookie;
 			/* REO OOR msdu drop count */
 			uint32_t reo_err_oor_drop;
 			/* REO OOR msdu indicated to stack count */
@@ -1024,8 +1057,6 @@ struct dp_soc_stats {
 			uint32_t nbuf_sanity_fail;
 			/* Duplicate link desc refilled */
 			uint32_t dup_refill_link_desc;
-			/* REO OOR eapol drop count */
-			uint32_t reo_err_oor_eapol_drop;
 			/* count of start sequence (ssn) updates */
 			uint32_t ssn_update_count;
 			/* count of bar handling fail */
@@ -1034,6 +1065,8 @@ struct dp_soc_stats {
 			uint32_t intrabss_eapol_drop;
 			/* Non Eapol pkt drop cnt due to peer not authorized */
 			uint32_t peer_unauth_rx_pkt_drop;
+			/* MSDU len err count */
+			uint32_t msdu_len_err;
 		} err;
 
 		/* packet count per core - per ring */
@@ -1670,6 +1703,12 @@ struct dp_soc {
 
 	/* SoC level data path statistics */
 	struct dp_soc_stats stats;
+
+	/* timestamp to keep track of msdu buffers received on reo err ring */
+	uint64_t rx_route_err_start_pkt_ts;
+
+	/* Num RX Route err in a given window to keep track of rate of errors */
+	uint32_t rx_route_err_in_window;
 
 	/* Enable processing of Tx completion status words */
 	bool process_tx_status;
